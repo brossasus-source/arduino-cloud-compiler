@@ -30,13 +30,20 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.arduino15
-          key: arduino15-esp8266-v1
+          key: arduino15-${{ startsWith(inputs.fqbn, 'esp8266') && 'esp8266' || 'avr' }}-v1
 
       - name: Install core
+        env:
+          FQBN: ${{ inputs.fqbn }}
         run: |
-          URL=https://arduino.esp8266.com/stable/package_esp8266com_index.json
-          arduino-cli core update-index --additional-urls $URL
-          arduino-cli core install esp8266:esp8266 --additional-urls $URL
+          if [[ "$FQBN" == esp8266:* ]]; then
+            URL=https://arduino.esp8266.com/stable/package_esp8266com_index.json
+            arduino-cli core update-index --additional-urls $URL
+            arduino-cli core install esp8266:esp8266 --additional-urls $URL
+          else
+            arduino-cli core update-index
+            arduino-cli core install arduino:avr
+          fi
 
       - name: Extract libraries
         run: |
@@ -59,6 +66,7 @@ jobs:
           RC=$?
           cat out/log.txt
           [ -f build/sketch.ino.bin ] && cp build/sketch.ino.bin out/
+          [ -f build/sketch.ino.hex ] && cp build/sketch.ino.hex out/
           exit $RC
 
       - name: Upload result
