@@ -1,0 +1,70 @@
+name: Compile Arduino Code
+run-name: "compile ${{ inputs.job_id }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      code_b64:
+        description: 'Base64 sketch'
+        required: true
+        type: string
+      fqbn:
+        description: 'Board FQBN'
+        required: true
+        default: 'esp8266:esp8266:d1_mini'
+        type: string
+      job_id:
+        description: 'Unique job id'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v1
+
+      - name: Cache Arduino cores
+        uses: actions/cache@v4
+        with:
+          path: ~/.arduino15
+          key: arduino15-esp8266-v1
+
+      - name: Install core
+        run: |
+          URL=https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          arduino-cli core update-index --additional-urls $URL
+          arduino-cli core install esp8266:esp8266 --additional-urls $URL
+
+      - name: Extract libraries
+        run: |
+          mkdir -p ~/Arduino/libraries
+          if [ -f libraries/library.zip ]; then
+            unzip -oq libraries/library.zip -d ~/Arduino/libraries/
+          else
+            echo "Uyari: libraries/library.zip bulunamadi"
+          fi
+
+      - name: Compile
+        env:
+          CODE_B64: ${{ inputs.code_b64 }}
+          FQBN: ${{ inputs.fqbn }}
+        run: |
+          mkdir -p sketch build out
+          echo "$CODE_B64" | base64 -d > sketch/sketch.ino
+          set +e
+          arduino-cli compile --fqbn "$FQBN" --output-dir build sketch > out/log.txt 2>&1
+          RC=$?
+          cat out/log.txt
+          [ -f build/sketch.ino.bin ] && cp build/sketch.ino.bin out/
+          exit $RC
+
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: result
+          path: out/
+          retention-days: 1
