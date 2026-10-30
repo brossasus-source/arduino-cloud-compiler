@@ -54,6 +54,14 @@ jobs:
             echo "Uyari: libraries/library.zip bulunamadi"
           fi
 
+      # Servo.h, arduino-cli kurulumunda hazir gelmez (Arduino IDE'de gelir) -> AVR kartlar icin ayrica kurulur.
+      # ESP8266 cekirdeginin kendi Servo kutuphanesi var, o yuzden orada gerekmez.
+      - name: Install Servo library (AVR)
+        if: ${{ !startsWith(inputs.fqbn, 'esp8266') }}
+        run: |
+          arduino-cli lib update-index
+          arduino-cli lib install "Servo"
+
       - name: Compile
         env:
           CODE_B64: ${{ inputs.code_b64 }}
